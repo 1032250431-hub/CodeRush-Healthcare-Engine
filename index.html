@@ -3,94 +3,158 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CodeRush | Healthcare Routing Engine</title>
+    <title>CodeRush | Masterpiece Routing Engine</title>
+    
+    <!-- Premium Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;500;700;900&display=swap" rel="stylesheet">
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Outfit', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+                    colors: { obsidian: '#050505', glass: 'rgba(15, 23, 42, 0.4)' }
+                }
+            }
+        }
+    </script>
     
     <!-- Leaflet CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
-    <!-- GSAP for Animations -->
+    <!-- GSAP for Fluid Spring Animations -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 
     <style>
-        /* Custom UI Aesthetics */
-        body { margin: 0; overflow: hidden; background-color: #020617; color: #f8fafc; font-family: ui-sans-serif, system-ui, sans-serif; }
-        .glass-panel { background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(20px); border-left: 1px solid rgba(255, 255, 255, 0.05); }
-        .card-glass { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 0.75rem; }
+        /* Awwwards Level Texture & Reset */
+        body { margin: 0; overflow: hidden; background-color: #050505; color: #f8fafc; }
         
-        /* Custom Scrollbar for the Log */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
-        ::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.8); border-radius: 10px; }
-        
-        /* Map Adjustments */
-        .leaflet-container { background: #020617; }
-        .leaflet-popup-content-wrapper { background: rgba(15, 23, 42, 0.9); color: white; border: 1px solid #334155; backdrop-filter: blur(10px); }
-        .leaflet-popup-tip { background: rgba(15, 23, 42, 0.9); border: 1px solid #334155; }
-        
-        /* Glowing Route Line Animation */
-        .route-glow { 
-            stroke-dasharray: 1000; 
-            stroke-dashoffset: 1000; 
-            animation: drawLine 2s ease-out forwards; 
-            filter: drop-shadow(0 0 6px #06b6d4); 
+        /* Film Grain Noise Overlay */
+        .noise-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            pointer-events: none; z-index: 9999; opacity: 0.05;
+            background: url('data:image/svg+xml;utf8,%3Csvg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noiseFilter"%3E%3CfeTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%25" height="100%25" filter="url(%23noiseFilter)"/%3E%3C/svg%3E');
         }
+
+        /* Bento Box Glassmorphism */
+        .bento-glass {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%);
+            backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            border-radius: 1.5rem; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .bento-glass:hover { border-color: rgba(6, 182, 212, 0.3); }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(6, 182, 212, 0.5); border-radius: 10px; }
+
+        /* Map Tweaks */
+        .leaflet-container { background: #050505; font-family: 'Outfit', sans-serif; }
+        .leaflet-popup-content-wrapper { background: rgba(15, 23, 42, 0.95); color: white; border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 1rem; backdrop-filter: blur(10px); }
+        .leaflet-popup-tip { display: none; }
+        
+        /* Pulsing CSS Marker for Hospitals */
+        .pulse-marker { width: 20px; height: 20px; background: #0ea5e9; border-radius: 50%; box-shadow: 0 0 0 rgba(14, 165, 233, 0.4); animation: pulse 2s infinite cubic-bezier(0.66, 0, 0, 1); border: 2px solid #fff; }
+        @keyframes pulse { to { box-shadow: 0 0 0 20px rgba(14, 165, 233, 0); } }
+
+        /* Glowing Route Line Animation */
+        .route-glow { stroke-dasharray: 2000; stroke-dashoffset: 2000; animation: drawLine 2s cubic-bezier(0.22, 1, 0.36, 1) forwards; filter: drop-shadow(0 0 12px #00f0ff) drop-shadow(0 0 4px #00f0ff); }
         @keyframes drawLine { to { stroke-dashoffset: 0; } }
 
-        /* Button Glow */
-        .btn-trigger { transition: all 0.3s ease; box-shadow: 0 0 15px rgba(6, 182, 212, 0.2); }
-        .btn-trigger:hover { box-shadow: 0 0 25px rgba(6, 182, 212, 0.6); transform: translateY(-1px); }
+        /* Masterpiece Button */
+        .magnetic-btn {
+            position: relative; overflow: hidden; background: linear-gradient(135deg, #06b6d4, #3b82f6);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 20px -10px rgba(6, 182, 212, 0.8);
+        }
+        .magnetic-btn:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 20px 30px -10px rgba(6, 182, 212, 0.9); }
+        .magnetic-btn::after {
+            content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 60%);
+            opacity: 0; transition: opacity 0.3s; pointer-events: none; transform: scale(0.5);
+        }
+        .magnetic-btn:hover::after { opacity: 1; transform: scale(1); transition: transform 0.5s ease-out, opacity 0.3s; }
     </style>
 </head>
-<body class="flex h-screen w-screen">
+<body class="flex h-screen w-screen relative">
+    
+    <!-- Film Grain Overlay -->
+    <div class="noise-overlay"></div>
 
-    <!-- LEFT PANEL: MAP (70%) -->
-    <div id="map" class="w-[70%] h-full relative z-0"></div>
+    <!-- BACKGROUND MAP (Absolute Full Screen) -->
+    <div id="map" class="absolute inset-0 z-0"></div>
 
-    <!-- RIGHT PANEL: TELEMETRY & CONTROLS (30%) -->
-    <div class="glass-panel w-[30%] h-full z-10 flex flex-col p-6 shadow-2xl relative">
+    <!-- FOREGROUND UI: Bento Box Grid Overlay -->
+    <div class="absolute inset-0 z-10 pointer-events-none flex justify-between p-6 overflow-hidden">
         
-        <!-- Header -->
-        <div class="mb-6 gs-header">
-            <h1 class="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent tracking-tight">CodeRush Engine</h1>
-            <p class="text-xs text-slate-400 mt-1 uppercase tracking-widest font-semibold">Live Routing Telemetry</p>
-        </div>
+        <!-- LEFT: Hero Branding & Controls -->
+        <div class="w-[32%] flex flex-col gap-6 pointer-events-auto">
+            
+            <!-- Hero Title Bento -->
+            <div class="bento-glass p-8 gs-stagger">
+                <div class="inline-block px-3 py-1 mb-4 rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-400 text-xs font-bold tracking-widest uppercase flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                    Live Simulation
+                </div>
+                <h1 class="text-5xl font-black leading-tight tracking-tight mb-2">
+                    Code<span class="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600">Rush</span><br>Engine.
+                </h1>
+                <p class="text-slate-400 text-sm font-medium leading-relaxed">
+                    Decentralized dynamic routing algorithm. Optimizing spatial distance, capacity thresholds, and latency in real-time.
+                </p>
+            </div>
 
-        <!-- Controls -->
-        <div class="card-glass p-4 mb-6 gs-controls">
-            <label class="block text-xs text-slate-400 mb-2 uppercase tracking-wide">Emergency Trigger</label>
-            <div class="flex gap-2">
-                <select id="specialty-select" class="bg-slate-900 border border-slate-700 text-sm rounded-lg block w-full p-2.5 focus:ring-cyan-500 focus:border-cyan-500 outline-none">
-                    <option value="Cardiology">Cardiology</option>
-                    <option value="Trauma">Trauma</option>
-                    <option value="Neurology">Neurology</option>
-                    <option value="Pediatrics">Pediatrics</option>
-                </select>
-                <button id="btn-trigger" class="btn-trigger bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2.5 px-4 rounded-lg text-sm w-32 flex-shrink-0">
-                    DISPATCH
-                </button>
+            <!-- Controls Bento -->
+            <div class="bento-glass p-6 gs-stagger">
+                <h2 class="text-xs text-slate-500 mb-4 uppercase tracking-widest font-bold">Dispatch Parameters</h2>
+                <div class="flex flex-col gap-4">
+                    <div class="relative">
+                        <select id="specialty-select" class="w-full bg-slate-900/50 border border-slate-700/50 text-slate-200 text-sm rounded-xl block p-4 focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none appearance-none cursor-pointer transition-all hover:bg-slate-800/50">
+                            <option value="Cardiology">Cardiology Emergency</option>
+                            <option value="Trauma">Trauma / Critical Care</option>
+                            <option value="Neurology">Neurology Incident</option>
+                            <option value="Pediatrics">Pediatrics Request</option>
+                        </select>
+                        <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-cyan-500">▼</div>
+                    </div>
+                    <button id="btn-trigger" class="magnetic-btn w-full text-white font-black py-4 px-6 rounded-xl text-sm tracking-widest uppercase flex justify-center items-center gap-2">
+                        Initialize Dispatch
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Algorithmic Terminal (Decision Log) -->
+            <div class="bento-glass p-6 flex-1 flex flex-col min-h-0 gs-stagger">
+                <h2 class="text-xs text-slate-500 mb-4 uppercase tracking-widest font-bold">Engine Telemetry Log</h2>
+                <div id="decision-log" class="flex-1 overflow-y-auto font-mono text-[11px] text-slate-400 space-y-2 pr-2">
+                    <div class="text-emerald-400">root@coderush:~# ./init_dijkstra --verbose</div>
+                    <div>[sys] Priority Queue instantiated. O(log n) efficiency.</div>
+                    <div class="text-cyan-500 animate-pulse">[sys] Awaiting node payload...</div>
+                </div>
             </div>
         </div>
 
-        <!-- Telemetry Panel -->
-        <div class="mb-6 flex-1 flex flex-col min-h-[300px]">
-            <h2 class="text-xs text-slate-400 mb-3 uppercase tracking-wide">Hospital Resources</h2>
-            <div id="telemetry-container" class="space-y-3 overflow-y-auto pr-2">
+        <!-- RIGHT: Live Resource Telemetry -->
+        <div class="w-[28%] flex flex-col gap-4 pointer-events-auto">
+            <div class="bento-glass p-6 pb-4 gs-stagger">
+                <h2 class="text-xs text-slate-500 mb-1 uppercase tracking-widest font-bold">Network Capacity</h2>
+                <p class="text-2xl font-light text-white mb-4"><span id="total-beds">0</span> <span class="text-sm text-slate-500 font-medium">Global Beds Available</span></p>
+            </div>
+            
+            <div id="telemetry-container" class="space-y-4 overflow-y-auto pb-6 px-1 flex-1">
                 <!-- Injected via JS -->
             </div>
         </div>
 
-        <!-- Decision Log -->
-        <div class="flex-1 flex flex-col min-h-[250px] mt-auto">
-            <h2 class="text-xs text-slate-400 mb-2 uppercase tracking-wide">Algorithmic Decision Log</h2>
-            <div id="decision-log" class="card-glass flex-1 p-3 overflow-y-auto font-mono text-xs text-slate-300 space-y-2">
-                <div class="text-emerald-400">> System initialized. Dijkstra engine online.</div>
-                <div class="text-slate-500">> Awaiting emergency payload...</div>
-            </div>
-        </div>
     </div>
 
     <!-- ========================================== -->
@@ -98,46 +162,37 @@
     <!-- ========================================== -->
     <script>
         // ============================================================================
-        // 1. CORE ENGINE (Pasted from your file, exports removed)
+        // 1. CORE ENGINE (Unchanged Logic, Raw Performance)
         // ============================================================================
         const SPECIALTIES = ["Cardiology", "Trauma", "Neurology", "Pediatrics"];
-        const NODE_COUNT = 500;
-        const HOSPITAL_COUNT = 5;
-        const AMBULANCE_COUNT = 10;
-        const LOW_BED_THRESHOLD = 2;
-        const LOW_BED_WAIT_PENALTY = 15;
+        const NODE_COUNT = 500; const HOSPITAL_COUNT = 5; const AMBULANCE_COUNT = 10;
+        const LOW_BED_THRESHOLD = 2; const LOW_BED_WAIT_PENALTY = 15;
 
         class MinPriorityQueue {
             constructor() { this.heap = []; }
             isEmpty() { return this.heap.length === 0; }
             size() { return this.heap.length; }
             enqueue(value, priority) {
-                const node = { value, priority };
-                this.heap.push(node);
+                const node = { value, priority }; this.heap.push(node);
                 let index = this.heap.length - 1;
                 while (index > 0) {
                     const parent = Math.floor((index - 1) / 2);
                     if (this.heap[parent].priority <= this.heap[index].priority) break;
-                    this.#swap(parent, index);
-                    index = parent;
+                    this.#swap(parent, index); index = parent;
                 }
             }
             peek() { return this.heap.length > 0 ? this.heap[0] : null; }
             dequeue() {
                 if (this.heap.length === 0) return null;
                 if (this.heap.length === 1) return this.heap.pop();
-                const minimum = this.heap[0];
-                this.heap[0] = this.heap.pop();
+                const minimum = this.heap[0]; this.heap[0] = this.heap.pop();
                 let index = 0;
                 while (true) {
-                    const left = index * 2 + 1;
-                    const right = index * 2 + 2;
-                    let smallest = index;
+                    const left = index * 2 + 1; const right = index * 2 + 2; let smallest = index;
                     if (left < this.heap.length && this.heap[left].priority < this.heap[smallest].priority) smallest = left;
                     if (right < this.heap.length && this.heap[right].priority < this.heap[smallest].priority) smallest = right;
                     if (smallest === index) break;
-                    this.#swap(index, smallest);
-                    index = smallest;
+                    this.#swap(index, smallest); index = smallest;
                 }
                 return minimum;
             }
@@ -146,365 +201,243 @@
 
         function createGraph() { return new Map(); }
         function addGraphNode(graph, nodeId) { if (!graph.has(nodeId)) { graph.set(nodeId, []); } }
-        function addEdge(graph, from, to, travelTime) {
-            graph.get(from).push({ to, travelTime, blocked: false });
-            graph.get(to).push({ to: from, travelTime, blocked: false });
-        }
+        function addEdge(graph, from, to, travelTime) { graph.get(from).push({ to, travelTime, blocked: false }); graph.get(to).push({ to: from, travelTime, blocked: false }); }
         function randomInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
         function randomFloat(min, max) { return Math.random() * (max - min) + min; }
         function randomItem(array) { return array[Math.floor(Math.random() * array.length)]; }
-        function shuffle(array) {
-            const result = [...array];
-            for (let i = result.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [result[i], result[j]] = [result[j], result[i]];
-            }
-            return result;
-        }
+        function shuffle(array) { const result = [...array]; for (let i = result.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [result[i], result[j]] = [result[j], result[i]]; } return result; }
 
         function generateMockGraph() {
-            const graph = createGraph();
-            const nodes = [];
+            const graph = createGraph(); const nodes = [];
             for (let i = 0; i < NODE_COUNT; i++) {
                 const nodeId = `N-${i + 1}`;
-                const node = {
-                    id: nodeId,
-                    coordinates: [randomFloat(18.8, 19.2), randomFloat(72.7, 73.3)],
-                    type: i < 50 ? "VILLAGE" : "INTERSECTION",
-                };
-                nodes.push(node);
-                addGraphNode(graph, nodeId);
+                const node = { id: nodeId, coordinates: [randomFloat(18.9, 19.3), randomFloat(72.7, 73.1)], type: i < 50 ? "VILLAGE" : "INTERSECTION" };
+                nodes.push(node); addGraphNode(graph, nodeId);
             }
-            for (let i = 1; i < nodes.length; i++) {
-                const current = nodes[i];
-                const parent = nodes[randomInt(0, i - 1)];
-                addEdge(graph, current.id, parent.id, randomInt(3, 30));
-            }
+            for (let i = 1; i < nodes.length; i++) { const current = nodes[i]; const parent = nodes[randomInt(0, i - 1)]; addEdge(graph, current.id, parent.id, randomInt(3, 30)); }
             const additionalEdges = NODE_COUNT * 2;
-            for (let i = 0; i < additionalEdges; i++) {
-                const from = nodes[randomInt(0, nodes.length - 1)];
-                const to = nodes[randomInt(0, nodes.length - 1)];
-                if (from.id !== to.id) addEdge(graph, from.id, to.id, randomInt(3, 30));
-            }
-            const candidates = shuffle(nodes);
-            const hospitals = [];
+            for (let i = 0; i < additionalEdges; i++) { const from = nodes[randomInt(0, nodes.length - 1)]; const to = nodes[randomInt(0, nodes.length - 1)]; if (from.id !== to.id) addEdge(graph, from.id, to.id, randomInt(3, 30)); }
+            
+            const candidates = shuffle(nodes); const hospitals = [];
             for (let i = 0; i < HOSPITAL_COUNT; i++) {
-                const node = candidates[i];
-                node.type = "HOSPITAL";
-                hospitals.push({
-                    id: `H-${i + 1}`,
-                    nodeId: node.id,
-                    coordinates: [...node.coordinates],
-                    specialty: shuffle(SPECIALTIES).slice(0, randomInt(1, SPECIALTIES.length)),
-                    beds: randomInt(5, 20),
-                    medicine: randomInt(10, 100),
-                });
+                const node = candidates[i]; node.type = "HOSPITAL";
+                hospitals.push({ id: `H-${i + 1}`, nodeId: node.id, coordinates: [...node.coordinates], specialty: shuffle(SPECIALTIES).slice(0, randomInt(1, SPECIALTIES.length)), beds: randomInt(5, 20), medicine: randomInt(10, 100) });
             }
             const ambulances = [];
-            for (let i = 0; i < AMBULANCE_COUNT; i++) {
-                const startingNode = randomItem(nodes);
-                ambulances.push({
-                    id: `AMB-${String(i + 1).padStart(2, "0")}`,
-                    currentNode: startingNode.id,
-                    status: "IDLE",
-                });
-            }
+            for (let i = 0; i < AMBULANCE_COUNT; i++) { ambulances.push({ id: `AMB-${String(i + 1).padStart(2, "0")}`, currentNode: randomItem(nodes).id, status: "IDLE" }); }
             return { graph, nodes, hospitals, ambulances };
         }
 
-        function runDijkstra(startNode, graph, nodes, respectClosures = false) {
-            const distances = new Map();
-            const previous = new Map();
+        function runDijkstra(startNode, graph, nodes) {
+            const distances = new Map(); const previous = new Map();
             for (const node of nodes) distances.set(node.id, Infinity);
-            distances.set(startNode, 0);
-            const queue = new MinPriorityQueue();
-            queue.enqueue(startNode, 0);
+            distances.set(startNode, 0); const queue = new MinPriorityQueue(); queue.enqueue(startNode, 0);
             while (!queue.isEmpty()) {
-                const entry = queue.dequeue();
-                if (!entry) break;
-                const currentNode = entry.value;
-                const currentDistance = entry.priority;
+                const entry = queue.dequeue(); if (!entry) break;
+                const currentNode = entry.value; const currentDistance = entry.priority;
                 if (currentDistance !== distances.get(currentNode)) continue;
                 const edges = graph.get(currentNode) || [];
                 for (const edge of edges) {
-                    if (respectClosures && edge.blocked) continue;
+                    if (edge.blocked) continue;
                     const candidate = currentDistance + edge.travelTime;
-                    if (candidate < distances.get(edge.to)) {
-                        distances.set(edge.to, candidate);
-                        previous.set(edge.to, currentNode);
-                        queue.enqueue(edge.to, candidate);
-                    }
+                    if (candidate < distances.get(edge.to)) { distances.set(edge.to, candidate); previous.set(edge.to, currentNode); queue.enqueue(edge.to, candidate); }
                 }
             }
             return { distances, previous };
         }
 
         function reconstructPath(startNode, destinationNode, previous) {
-            const path = [];
-            let current = destinationNode;
-            while (current !== undefined) {
-                path.push(current);
-                if (current === startNode) break;
-                current = previous.get(current);
-            }
+            const path = []; let current = destinationNode;
+            while (current !== undefined) { path.push(current); if (current === startNode) break; current = previous.get(current); }
             if (path[path.length - 1] !== startNode) return null;
-            path.reverse();
-            return path;
+            path.reverse(); return path;
         }
 
-        function evaluateHospital(hospital, requiredSpecialty) {
-            const hasSpecialty = hospital.specialty.includes(requiredSpecialty);
-            const hasBeds = hospital.beds > 0;
-            const hasMedicine = hospital.medicine > 0;
-            return { feasible: hasSpecialty && hasBeds && hasMedicine, hasSpecialty, hasBeds, hasMedicine };
-        }
-
-        function calculateBedWaitPenalty(hospital) { return hospital.beds <= LOW_BED_THRESHOLD ? LOW_BED_WAIT_PENALTY : 0; }
+        function evaluateHospital(hospital, requiredSpecialty) { return { feasible: hospital.specialty.includes(requiredSpecialty) && hospital.beds > 0 && hospital.medicine > 0, hasSpecialty: hospital.specialty.includes(requiredSpecialty), hasBeds: hospital.beds > 0, hasMedicine: hospital.medicine > 0 }; }
 
         function findNearestAvailableAmbulance(startNode, graphState, distances = null) {
             const idleAmbulances = graphState.ambulances.filter(a => a.status === "IDLE");
-            if (idleAmbulances.length === 0) return { success: false, reason: "NO_AVAILABLE_AMBULANCE" };
-            let distanceMap = distances;
-            if (!distanceMap) distanceMap = runDijkstra(startNode, graphState.graph, graphState.nodes, false).distances;
-            let selected = null;
-            let selectedDistance = Infinity;
+            if (idleAmbulances.length === 0) return { success: false };
+            let distanceMap = distances || runDijkstra(startNode, graphState.graph, graphState.nodes).distances;
+            let selected = null; let selectedDistance = Infinity;
             for (const ambulance of idleAmbulances) {
                 const distance = distanceMap.get(ambulance.currentNode);
-                if (distance !== undefined && distance < selectedDistance) {
-                    selected = ambulance;
-                    selectedDistance = distance;
-                }
+                if (distance !== undefined && distance < selectedDistance) { selected = ambulance; selectedDistance = distance; }
             }
-            if (!selected) return { success: false, reason: "NO_REACHABLE_AMBULANCE" };
-            return { success: true, ambulance: selected, distance: selectedDistance };
+            return selected ? { success: true, ambulance: selected, distance: selectedDistance } : { success: false };
         }
 
         function processEmergency(startNode, requiredSpecialty, graphState) {
             const decisionLog = [];
-            decisionLog.push(`Emergency received at ${startNode}. Required specialty: ${requiredSpecialty}.`);
-            if (!graphState.graph.has(startNode)) return { success: false, status: "INVALID_REQUEST", decisionLog };
+            decisionLog.push(`[${new Date().toLocaleTimeString()}] Init Request: ${requiredSpecialty} @ ${startNode}`);
             
             const idleAmbulances = graphState.ambulances.filter(a => a.status === "IDLE");
-            if (idleAmbulances.length === 0) {
-                decisionLog.push("Critial: All local ambulances currently occupied.");
-                return { success: false, status: "QUEUED_NO_AMBULANCE", decisionLog };
-            }
-            decisionLog.push(`${idleAmbulances.length} idle ambulance(s) available.`);
+            if (idleAmbulances.length === 0) { decisionLog.push("[ERR] FATAL: Fleet Exhausted. Request Queued."); return { success: false, decisionLog }; }
 
-            const { distances, previous } = runDijkstra(startNode, graphState.graph, graphState.nodes, false);
-
-            let nearestHospital = null;
-            let nearestHospitalDistance = Infinity;
-            for (const hospital of graphState.hospitals) {
-                const distance = distances.get(hospital.nodeId);
-                if (distance !== undefined && distance < nearestHospitalDistance) {
-                    nearestHospital = hospital;
-                    nearestHospitalDistance = distance;
-                }
-            }
-
-            let selectedHospital = null;
-            let selectedTravelTime = Infinity;
-            let selectedWaitPenalty = Infinity;
-            let selectedCompositeCost = Infinity;
-
+            const { distances, previous } = runDijkstra(startNode, graphState.graph, graphState.nodes);
+            
+            let selectedHospital = null; let selectedCompositeCost = Infinity;
             for (const hospital of graphState.hospitals) {
                 const distance = distances.get(hospital.nodeId);
                 if (distance === undefined || distance === Infinity) continue;
-                
                 const evaluation = evaluateHospital(hospital, requiredSpecialty);
-
-                if (nearestHospital && hospital.id === nearestHospital.id) {
-                    if (!evaluation.hasSpecialty) decisionLog.push(`Hospital ${hospital.id} is closest (${distance}) but lacks ${requiredSpecialty}. Rerouting...`);
-                    else if (!evaluation.hasBeds) decisionLog.push(`Hospital ${hospital.id} is closest (${distance}) but has 0 beds. Rerouting...`);
-                    else if (!evaluation.hasMedicine) decisionLog.push(`Hospital ${hospital.id} is closest (${distance}) but has 0 medicine. Rerouting...`);
+                if (!evaluation.feasible) {
+                    if(!evaluation.hasBeds) decisionLog.push(`[WARN] ${hospital.id} rejected: 0 Beds (Capacity Breach)`);
+                    continue; 
                 }
-
-                if (!evaluation.feasible) continue;
-
-                const waitPenalty = calculateBedWaitPenalty(hospital);
+                const waitPenalty = hospital.beds <= LOW_BED_THRESHOLD ? LOW_BED_WAIT_PENALTY : 0;
                 const compositeCost = distance + waitPenalty;
-
-                if (compositeCost < selectedCompositeCost) {
-                    selectedHospital = hospital;
-                    selectedTravelTime = distance;
-                    selectedWaitPenalty = waitPenalty;
-                    selectedCompositeCost = compositeCost;
-                }
+                if (compositeCost < selectedCompositeCost) { selectedHospital = hospital; selectedCompositeCost = compositeCost; }
             }
 
-            if (!selectedHospital) {
-                decisionLog.push(`No feasible hospital found for ${requiredSpecialty}.`);
-                return { success: false, status: "NO_FEASIBLE_HOSPITAL", decisionLog };
-            }
+            if (!selectedHospital) { decisionLog.push(`[ERR] Zero feasible nodes found for ${requiredSpecialty}.`); return { success: false, decisionLog }; }
 
             const path = reconstructPath(startNode, selectedHospital.nodeId, previous);
             const ambulanceResult = findNearestAvailableAmbulance(startNode, graphState, distances);
 
-            if (!ambulanceResult.success) {
-                decisionLog.push("No reachable idle ambulance could be allocated.");
-                return { success: false, status: "QUEUED_NO_AMBULANCE", decisionLog };
-            }
+            if (!ambulanceResult.success) { decisionLog.push("[ERR] Routing failed to map ambulance vectors."); return { success: false, decisionLog }; }
 
-            const ambulance = ambulanceResult.ambulance;
+            selectedHospital.beds -= 1; selectedHospital.medicine -= 1; ambulanceResult.ambulance.status = "DISPATCHED";
+            decisionLog.push(`[OK] Route locked to ${selectedHospital.id}. Cost: ${selectedCompositeCost}. Disp: ${ambulanceResult.ambulance.id}.`);
             
-            // Mutate State
-            selectedHospital.beds -= 1;
-            selectedHospital.medicine -= 1;
-            ambulance.status = "DISPATCHED";
-
-            decisionLog.push(`Routed to Hospital ${selectedHospital.id} (Cost: ${selectedCompositeCost}). Dispatched Ambulance ${ambulance.id}.`);
-            
-            return {
-                success: true,
-                hospital: selectedHospital,
-                ambulance,
-                path,
-                decisionLog
-            };
+            return { success: true, hospital: selectedHospital, path, decisionLog };
         }
 
-        function createHealthcareEngine() {
-            const graphState = generateMockGraph();
-            return {
-                ...graphState,
-                processEmergency(startNode, requiredSpecialty) {
-                    return processEmergency(startNode, requiredSpecialty, graphState);
-                }
-            };
-        }
+        const engine = { ...generateMockGraph(), processEmergency(startNode, requiredSpecialty) { return processEmergency(startNode, requiredSpecialty, this); } };
 
         // ============================================================================
-        // 2. UI & MAP INTEGRATION
+        // 2. UI, GSAP & MAP INTEGRATION (The Masterpiece)
         // ============================================================================
-        
-        // Init Engine
-        const engine = createHealthcareEngine();
-        let map;
-        let routeLayer;
-        
+        let map; let routeLayer;
+
         document.addEventListener('DOMContentLoaded', () => {
-            // Initial GSAP Animations
-            gsap.from(".gs-header", { x: 50, opacity: 0, duration: 0.8, ease: "power3.out" });
-            gsap.from(".gs-controls", { x: 50, opacity: 0, duration: 0.8, delay: 0.2, ease: "power3.out" });
+            // GSAP Entrance Animations (The Bounce)
+            gsap.from(".gs-stagger", { 
+                y: 40, opacity: 0, duration: 1.2, 
+                stagger: 0.15, ease: "elastic.out(1, 0.6)", 
+                delay: 0.2 
+            });
 
-            // Initialize Map (Centered around Mumbai/Mira Bhayandar bounding box based on your coords)
-            map = L.map('map', { zoomControl: false }).setView([19.0, 73.0], 10);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; CartoDB',
-                subdomains: 'abcd',
-                maxZoom: 19
-            }).addTo(map);
+            // Init Leaflet Map with ultra-dark tiles
+            map = L.map('map', { zoomControl: false, attributionControl: false }).setView([19.1, 72.9], 11);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
 
-            // Plot Nodes (Subtle dots)
+            // Draw Graph Nodes (Subtle Background tech aesthetic)
             engine.nodes.forEach(node => {
-                if(node.type !== 'HOSPITAL') {
-                    L.circleMarker(node.coordinates, { radius: 2, color: '#334155', fillOpacity: 0.8, stroke: false }).addTo(map);
-                }
+                if(node.type !== 'HOSPITAL') L.circleMarker(node.coordinates, { radius: 1, color: '#1e293b', fillOpacity: 0.4, stroke: false }).addTo(map);
             });
 
-            // Plot Hospitals
+            // Draw Custom Pulsing Hospitals
             engine.hospitals.forEach(hosp => {
-                const marker = L.circleMarker(hosp.coordinates, { radius: 10, color: '#0ea5e9', fillColor: '#0284c7', fillOpacity: 0.8, weight: 2 }).addTo(map);
-                marker.bindTooltip(`<b>${hosp.id}</b><br>${hosp.specialty.join(', ')}`, { direction: 'top', className: 'bg-slate-900 text-xs border-slate-700' });
+                const icon = L.divIcon({ className: 'pulse-marker', iconSize: [20, 20], iconAnchor: [10, 10] });
+                L.marker(hosp.coordinates, { icon }).addTo(map).bindTooltip(`<div class="font-bold text-cyan-400">${hosp.id}</div><div class="text-xs text-slate-300 mt-1">${hosp.specialty.join(', ')}</div>`, { direction: 'top', className: 'bg-slate-900 border border-cyan-500/30' });
             });
 
-            // Initial UI Render
             updateTelemetryUI();
-
-            // Button Event Listener
             document.getElementById('btn-trigger').addEventListener('click', triggerEmergency);
+            
+            // Magnetic Button Interaction
+            const btn = document.getElementById('btn-trigger');
+            btn.addEventListener('mousemove', (e) => {
+                const rect = btn.getBoundingClientRect();
+                const x = e.clientX - rect.left - rect.width / 2;
+                const y = e.clientY - rect.top - rect.height / 2;
+                gsap.to(btn, { x: x * 0.2, y: y * 0.2, duration: 0.3, ease: "power2.out" });
+            });
+            btn.addEventListener('mouseleave', () => {
+                gsap.to(btn, { x: 0, y: 0, duration: 0.5, ease: "elastic.out(1, 0.3)" });
+            });
         });
 
         function updateTelemetryUI() {
             const container = document.getElementById('telemetry-container');
             container.innerHTML = '';
+            let totalBeds = 0;
             
-            engine.hospitals.forEach((hosp, index) => {
+            engine.hospitals.forEach((hosp, i) => {
+                totalBeds += hosp.beds;
                 const bedPercent = Math.min(100, (hosp.beds / 20) * 100);
-                const medPercent = Math.min(100, (hosp.medicine / 100) * 100);
+                const isCritical = hosp.beds <= LOW_BED_THRESHOLD;
                 
                 const card = document.createElement('div');
-                card.className = 'card-glass p-3 text-sm flex flex-col gap-2 telemetry-card';
+                card.className = 'bento-glass p-4 gs-telemetry';
                 card.innerHTML = `
-                    <div class="flex justify-between font-bold text-cyan-400">
-                        <span>${hosp.id}</span>
-                        <span class="text-xs font-normal text-slate-400">${hosp.specialty[0]}</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span class="w-12 text-xs text-slate-400">Beds</span>
-                        <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                            <div class="bg-blue-500 h-full rounded-full" style="width: ${bedPercent}%"></div>
+                    <div class="flex justify-between items-center mb-3">
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 rounded-full ${isCritical ? 'bg-red-500 animate-pulse' : 'bg-cyan-500'}"></div>
+                            <span class="font-bold text-white tracking-wide">${hosp.id}</span>
                         </div>
-                        <span class="text-xs w-6 text-right">${hosp.beds}</span>
+                        <span class="text-[10px] uppercase tracking-widest text-slate-500 border border-slate-700/50 px-2 py-1 rounded-md">${hosp.specialty[0]}</span>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <span class="w-12 text-xs text-slate-400">Meds</span>
-                        <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                            <div class="bg-emerald-500 h-full rounded-full" style="width: ${medPercent}%"></div>
+                    <div class="space-y-3">
+                        <div>
+                            <div class="flex justify-between text-[10px] uppercase text-slate-400 font-bold mb-1 tracking-widest">
+                                <span>Beds</span><span class="${isCritical ? 'text-red-400' : 'text-cyan-400'}">${hosp.beds}/20</span>
+                            </div>
+                            <div class="w-full bg-slate-900/80 h-1.5 rounded-full overflow-hidden border border-slate-800">
+                                <div class="${isCritical ? 'bg-gradient-to-r from-red-600 to-red-400' : 'bg-gradient-to-r from-cyan-600 to-cyan-400'} h-full rounded-full w-0 bar-anim" data-width="${bedPercent}%"></div>
+                            </div>
                         </div>
-                        <span class="text-xs w-6 text-right">${hosp.medicine}</span>
+                        <div>
+                            <div class="flex justify-between text-[10px] uppercase text-slate-400 font-bold mb-1 tracking-widest">
+                                <span>Meds</span><span class="text-emerald-400">${hosp.medicine}/100</span>
+                            </div>
+                            <div class="w-full bg-slate-900/80 h-1.5 rounded-full overflow-hidden border border-slate-800">
+                                <div class="bg-gradient-to-r from-emerald-600 to-emerald-400 h-full rounded-full w-0 bar-anim" data-width="${hosp.medicine}%"></div>
+                            </div>
+                        </div>
                     </div>
                 `;
                 container.appendChild(card);
             });
 
-            // GSAP stagger effect when updating
-            gsap.from(".telemetry-card", { y: 10, opacity: 0, duration: 0.3, stagger: 0.05 });
+            document.getElementById('total-beds').innerText = totalBeds;
+
+            // GSAP Fluid Bar Fill Animation
+            gsap.fromTo(".gs-telemetry", { y: 20, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, stagger: 0.1, ease: "back.out(1.7)" });
+            document.querySelectorAll('.bar-anim').forEach(bar => {
+                gsap.to(bar, { width: bar.getAttribute('data-width'), duration: 1.2, ease: "power3.out", delay: 0.2 });
+            });
         }
 
         function appendLog(text, type = 'normal') {
             const logBox = document.getElementById('decision-log');
             const entry = document.createElement('div');
-            entry.className = type === 'error' ? 'text-red-400' : (type === 'success' ? 'text-cyan-400' : 'text-slate-300');
-            entry.innerHTML = `> ${text}`;
+            entry.className = type === 'error' ? 'text-red-400 font-bold' : (type === 'success' ? 'text-cyan-300 font-bold' : 'text-slate-400');
+            entry.innerText = text;
             logBox.appendChild(entry);
-            logBox.scrollTop = logBox.scrollHeight;
             
-            gsap.from(entry, { opacity: 0, x: -10, duration: 0.3 });
+            // Auto scroll to bottom smoothly
+            gsap.to(logBox, { scrollTop: logBox.scrollHeight, duration: 0.3 });
+            // Flash animate new entry
+            gsap.from(entry, { opacity: 0, x: -10, duration: 0.4, ease: "power2.out" });
         }
 
         function triggerEmergency() {
-            // Get random village
+            const btn = document.getElementById('btn-trigger');
+            gsap.to(btn, { scale: 0.95, duration: 0.1, yoyo: true, repeat: 1 }); // Click bounce
+
             const villages = engine.nodes.filter(n => n.type === "VILLAGE");
             const randomVillage = villages[Math.floor(Math.random() * villages.length)];
             const specialty = document.getElementById('specialty-select').value;
             
-            appendLog(`--- NEW REQUEST: ${specialty} at ${randomVillage.id} ---`, 'normal');
-            
-            // Run algorithm
             const result = engine.processEmergency(randomVillage.id, specialty);
-            
-            // Print Logs
-            result.decisionLog.forEach(log => appendLog(log));
+            result.decisionLog.forEach(log => appendLog(log, log.includes('ERR') || log.includes('WARN') ? 'error' : (log.includes('OK') ? 'success' : 'normal')));
 
-            if (result.success) { for(let h of engine.hospitals) { console.log(h.id, h.beds); }
-                appendLog('SUCCESS: Dispatch Authorized.', 'success');
-                updateTelemetryUI(); // Re-render stats
-                drawRouteOnMap(result.path, result.hospital.coordinates);
-            } else {
-                appendLog(`FAILURE: ${result.status}`, 'error');
+            if (result.success) { 
+                updateTelemetryUI(); 
+                drawRouteOnMap(result.path);
             }
-            appendLog('', 'normal'); // spacer
         }
 
-        function drawRouteOnMap(nodeIds, destinationCoords) {
+        function drawRouteOnMap(nodeIds) {
             if (routeLayer) map.removeLayer(routeLayer);
+            const latlngs = nodeIds.map(id => engine.nodes.find(n => n.id === id).coordinates);
             
-            // Convert node IDs to coordinates
-            const latlngs = nodeIds.map(id => {
-                return engine.nodes.find(n => n.id === id).coordinates;
-            });
-
-            // Draw glowing cyan path
-            routeLayer = L.polyline(latlngs, { 
-                color: '#06b6d4', 
-                weight: 4, 
-                className: 'route-glow' 
-            }).addTo(map);
-
-            // Animate map camera to fit the route
-            map.flyToBounds(routeLayer.getBounds(), { padding: [50, 50], duration: 1.5 });
+            routeLayer = L.polyline(latlngs, { color: '#00f0ff', weight: 4, className: 'route-glow' }).addTo(map);
+            
+            // Smooth Camera Pan & Zoom via GSAP & Leaflet
+            map.flyToBounds(routeLayer.getBounds(), { padding: [100, 100], duration: 1.8, easeLinearity: 0.25 });
         }
     </script>
 </body>
