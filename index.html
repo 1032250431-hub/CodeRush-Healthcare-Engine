@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeRush | Healthcare Routing Engine</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- GSAP for Animations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+    <style>
+        /* Custom UI Aesthetics */
+        body { margin: 0; overflow: hidden; background-color: #020617; color: #f8fafc; font-family: ui-sans-serif, system-ui, sans-serif; }
+        .glass-panel { background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(20px); border-left: 1px solid rgba(255, 255, 255, 0.05); }
+        .card-glass { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 0.75rem; }
+        
+        /* Custom Scrollbar for the Log */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
+        ::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.8); border-radius: 10px; }
+        
+        /* Map Adjustments */
+        .leaflet-container { background: #020617; }
+        .leaflet-popup-content-wrapper { background: rgba(15, 23, 42, 0.9); color: white; border: 1px solid #334155; backdrop-filter: blur(10px); }
+        .leaflet-popup-tip { background: rgba(15, 23, 42, 0.9); border: 1px solid #334155; }
+        
+        /* Glowing Route Line Animation */
+        .route-glow { 
+            stroke-dasharray: 1000; 
+            stroke-dashoffset: 1000; 
+            animation: drawLine 2s ease-out forwards; 
+            filter: drop-shadow(0 0 6px #06b6d4); 
+        }
+        @keyframes drawLine { to { stroke-dashoffset: 0; } }
+
+        /* Button Glow */
+        .btn-trigger { transition: all 0.3s ease; box-shadow: 0 0 15px rgba(6, 182, 212, 0.2); }
+        .btn-trigger:hover { box-shadow: 0 0 25px rgba(6, 182, 212, 0.6); transform: translateY(-1px); }
+    </style>
+</head>
+<body class="flex h-screen w-screen">
+
+    <!-- LEFT PANEL: MAP (70%) -->
+    <div id="map" class="w-[70%] h-full relative z-0"></div>
+
+    <!-- RIGHT PANEL: TELEMETRY & CONTROLS (30%) -->
+    <div class="glass-panel w-[30%] h-full z-10 flex flex-col p-6 shadow-2xl relative">
+        
+        <!-- Header -->
+        <div class="mb-6 gs-header">
+            <h1 class="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent tracking-tight">CodeRush Engine</h1>
+            <p class="text-xs text-slate-400 mt-1 uppercase tracking-widest font-semibold">Live Routing Telemetry</p>
+        </div>
+
+        <!-- Controls -->
+        <div class="card-glass p-4 mb-6 gs-controls">
+            <label class="block text-xs text-slate-400 mb-2 uppercase tracking-wide">Emergency Trigger</label>
+            <div class="flex gap-2">
+                <select id="specialty-select" class="bg-slate-900 border border-slate-700 text-sm rounded-lg block w-full p-2.5 focus:ring-cyan-500 focus:border-cyan-500 outline-none">
+                    <option value="Cardiology">Cardiology</option>
+                    <option value="Trauma">Trauma</option>
+                    <option value="Neurology">Neurology</option>
+                    <option value="Pediatrics">Pediatrics</option>
+                </select>
+                <button id="btn-trigger" class="btn-trigger bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2.5 px-4 rounded-lg text-sm w-32 flex-shrink-0">
+                    DISPATCH
+                </button>
+            </div>
+        </div>
+
+        <!-- Telemetry Panel -->
+        <div class="mb-6 flex-1 flex flex-col min-h-[300px]">
+            <h2 class="text-xs text-slate-400 mb-3 uppercase tracking-wide">Hospital Resources</h2>
+            <div id="telemetry-container" class="space-y-3 overflow-y-auto pr-2">
+                <!-- Injected via JS -->
+            </div>
+        </div>
+
+        <!-- Decision Log -->
+        <div class="flex-1 flex flex-col min-h-[250px] mt-auto">
+            <h2 class="text-xs text-slate-400 mb-2 uppercase tracking-wide">Algorithmic Decision Log</h2>
+            <div id="decision-log" class="card-glass flex-1 p-3 overflow-y-auto font-mono text-xs text-slate-300 space-y-2">
+                <div class="text-emerald-400">> System initialized. Dijkstra engine online.</div>
+                <div class="text-slate-500">> Awaiting emergency payload...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- ALGORITHM & APPLICATION LOGIC -->
+    <!-- ========================================== -->
+    <script>
+        // ============================================================================
+        // 1. CORE ENGINE (Pasted from your file, exports removed)
+        // ============================================================================
+        const SPECIALTIES = ["Cardiology", "Trauma", "Neurology", "Pediatrics"];
+        const NODE_COUNT = 500;
+        const HOSPITAL_COUNT = 5;
+        const AMBULANCE_COUNT = 10;
+        const LOW_BED_THRESHOLD = 2;
+        const LOW_BED_WAIT_PENALTY = 15;
+
+        class MinPriorityQueue {
+            constructor() { this.heap = []; }
+            isEmpty() { return this.heap.length === 0; }
+            size() { return this.heap.length; }
+            enqueue(value, priority) {
+                const node = { value, priority };
+                this.heap.push(node);
+                let index = this.heap.length - 1;
+                while (index > 0) {
+                    const parent = Math.floor((index - 1) / 2);
+                    if (this.heap[parent].priority <= this.heap[index].priority) break;
+                    this.#swap(parent, index);
+                    index = parent;
+                }
+            }
+            peek() { return this.heap.length > 0 ? this.heap[0] : null; }
+            dequeue() {
+                if (this.heap.length === 0) return null;
+                if (this.heap.length === 1) return this.heap.pop();
+                const minimum = this.heap[0];
+                this.heap[0] = this.heap.pop();
+                let index = 0;
+                while (true) {
+                    const left = index * 2 + 1;
+                    const right = index * 2 + 2;
+                    let smallest = index;
+                    if (left < this.heap.length && this.heap[left].priority < this.heap[smallest].priority) smallest = left;
+                    if (right < this.heap.length && this.heap[right].priority < this.heap[smallest].priority) smallest = right;
+                    if (smallest === index) break;
+                    this.#swap(index, smallest);
+                    index = smallest;
+                }
+                return minimum;
+            }
+            #swap(a, b) { [this.heap[a], this.heap[b]] = [this.heap[b], this.heap[a]]; }
+        }
+
+        function createGraph() { return new Map(); }
+        function addGraphNode(graph, nodeId) { if (!graph.has(nodeId)) { graph.set(nodeId, []); } }
+        function addEdge(graph, from, to, travelTime) {
+            graph.get(from).push({ to, travelTime, blocked: false });
+            graph.get(to).push({ to: from, travelTime, blocked: false });
+        }
+        function randomInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+        function randomFloat(min, max) { return Math.random() * (max - min) + min; }
+        function randomItem(array) { return array[Math.floor(Math.random() * array.length)]; }
+        function shuffle(array) {
+            const result = [...array];
+            for (let i = result.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [result[i], result[j]] = [result[j], result[i]];
+            }
+            return result;
+        }
+
+        function generateMockGraph() {
+            const graph = createGraph();
+            const nodes = [];
+            for (let i = 0; i < NODE_COUNT; i++) {
+                const nodeId = `N-${i + 1}`;
+                const node = {
+                    id: nodeId,
+                    coordinates: [randomFloat(18.8, 19.2), randomFloat(72.7, 73.3)],
+                    type: i < 50 ? "VILLAGE" : "INTERSECTION",
+                };
+                nodes.push(node);
+                addGraphNode(graph, nodeId);
+            }
+            for (let i = 1; i < nodes.length; i++) {
+                const current = nodes[i];
+                const parent = nodes[randomInt(0, i - 1)];
+                addEdge(graph, current.id, parent.id, randomInt(3, 30));
+            }
+            const additionalEdges = NODE_COUNT * 2;
+            for (let i = 0; i < additionalEdges; i++) {
+                const from = nodes[randomInt(0, nodes.length - 1)];
+                const to = nodes[randomInt(0, nodes.length - 1)];
+                if (from.id !== to.id) addEdge(graph, from.id, to.id, randomInt(3, 30));
+            }
+            const candidates = shuffle(nodes);
+            const hospitals = [];
+            for (let i = 0; i < HOSPITAL_COUNT; i++) {
+                const node = candidates[i];
+                node.type = "HOSPITAL";
+                hospitals.push({
+                    id: `H-${i + 1}`,
+                    nodeId: node.id,
+                    coordinates: [...node.coordinates],
+                    specialty: shuffle(SPECIALTIES).slice(0, randomInt(1, SPECIALTIES.length)),
+                    beds: randomInt(5, 20),
+                    medicine: randomInt(10, 100),
+                });
+            }
+            const ambulances = [];
+            for (let i = 0; i < AMBULANCE_COUNT; i++) {
+                const startingNode = randomItem(nodes);
+                ambulances.push({
+                    id: `AMB-${String(i + 1).padStart(2, "0")}`,
+                    currentNode: startingNode.id,
+                    status: "IDLE",
+                });
+            }
+            return { graph, nodes, hospitals, ambulances };
+        }
+
+        function runDijkstra(startNode, graph, nodes, respectClosures = false) {
+            const distances = new Map();
+            const previous = new Map();
+            for (const node of nodes) distances.set(node.id, Infinity);
+            distances.set(startNode, 0);
+            const queue = new MinPriorityQueue();
+            queue.enqueue(startNode, 0);
+            while (!queue.isEmpty()) {
+                const entry = queue.dequeue();
+                if (!entry) break;
+                const currentNode = entry.value;
+                const currentDistance = entry.priority;
+                if (currentDistance !== distances.get(currentNode)) continue;
+                const edges = graph.get(currentNode) || [];
+                for (const edge of edges) {
+                    if (respectClosures && edge.blocked) continue;
+                    const candidate = currentDistance + edge.travelTime;
+                    if (candidate < distances.get(edge.to)) {
+                        distances.set(edge.to, candidate);
+                        previous.set(edge.to, currentNode);
+                        queue.enqueue(edge.to, candidate);
+                    }
+                }
+            }
+            return { distances, previous };
+        }
+
+        function reconstructPath(startNode, destinationNode, previous) {
+            const path = [];
+            let current = destinationNode;
+            while (current !== undefined) {
+                path.push(current);
+                if (current === startNode) break;
+                current = previous.get(current);
+            }
+            if (path[path.length - 1] !== startNode) return null;
+            path.reverse();
+            return path;
+        }
+
+        function evaluateHospital(hospital, requiredSpecialty) {
+            const hasSpecialty = hospital.specialty.includes(requiredSpecialty);
+            const hasBeds = hospital.beds > 0;
+            const hasMedicine = hospital.medicine > 0;
+            return { feasible: hasSpecialty && hasBeds && hasMedicine, hasSpecialty, hasBeds, hasMedicine };
+        }
+
+        function calculateBedWaitPenalty(hospital) { return hospital.beds <= LOW_BED_THRESHOLD ? LOW_BED_WAIT_PENALTY : 0; }
+
+        function findNearestAvailableAmbulance(startNode, graphState, distances = null) {
+            const idleAmbulances = graphState.ambulances.filter(a => a.status === "IDLE");
+            if (idleAmbulances.length === 0) return { success: false, reason: "NO_AVAILABLE_AMBULANCE" };
+            let distanceMap = distances;
+            if (!distanceMap) distanceMap = runDijkstra(startNode, graphState.graph, graphState.nodes, false).distances;
+            let selected = null;
+            let selectedDistance = Infinity;
+            for (const ambulance of idleAmbulances) {
+                const distance = distanceMap.get(ambulance.currentNode);
+                if (distance !== undefined && distance < selectedDistance) {
+                    selected = ambulance;
+                    selectedDistance = distance;
+                }
+            }
+            if (!selected) return { success: false, reason: "NO_REACHABLE_AMBULANCE" };
+            return { success: true, ambulance: selected, distance: selectedDistance };
+        }
+
+        function processEmergency(startNode, requiredSpecialty, graphState) {
+            const decisionLog = [];
+            decisionLog.push(`Emergency received at ${startNode}. Required specialty: ${requiredSpecialty}.`);
+            if (!graphState.graph.has(startNode)) return { success: false, status: "INVALID_REQUEST", decisionLog };
+            
+            const idleAmbulances = graphState.ambulances.filter(a => a.status === "IDLE");
+            if (idleAmbulances.length === 0) {
+                decisionLog.push("Critial: All local ambulances currently occupied.");
+                return { success: false, status: "QUEUED_NO_AMBULANCE", decisionLog };
+            }
+            decisionLog.push(`${idleAmbulances.length} idle ambulance(s) available.`);
+
+            const { distances, previous } = runDijkstra(startNode, graphState.graph, graphState.nodes, false);
+
+            let nearestHospital = null;
+            let nearestHospitalDistance = Infinity;
+            for (const hospital of graphState.hospitals) {
+                const distance = distances.get(hospital.nodeId);
+                if (distance !== undefined && distance < nearestHospitalDistance) {
+                    nearestHospital = hospital;
+                    nearestHospitalDistance = distance;
+                }
+            }
+
+            let selectedHospital = null;
+            let selectedTravelTime = Infinity;
+            let selectedWaitPenalty = Infinity;
+            let selectedCompositeCost = Infinity;
+
+            for (const hospital of graphState.hospitals) {
+                const distance = distances.get(hospital.nodeId);
+                if (distance === undefined || distance === Infinity) continue;
+                
+                const evaluation = evaluateHospital(hospital, requiredSpecialty);
+
+                if (nearestHospital && hospital.id === nearestHospital.id) {
+                    if (!evaluation.hasSpecialty) decisionLog.push(`Hospital ${hospital.id} is closest (${distance}) but lacks ${requiredSpecialty}. Rerouting...`);
+                    else if (!evaluation.hasBeds) decisionLog.push(`Hospital ${hospital.id} is closest (${distance}) but has 0 beds. Rerouting...`);
+                    else if (!evaluation.hasMedicine) decisionLog.push(`Hospital ${hospital.id} is closest (${distance}) but has 0 medicine. Rerouting...`);
+                }
+
+                if (!evaluation.feasible) continue;
+
+                const waitPenalty = calculateBedWaitPenalty(hospital);
+                const compositeCost = distance + waitPenalty;
+
+                if (compositeCost < selectedCompositeCost) {
+                    selectedHospital = hospital;
+                    selectedTravelTime = distance;
+                    selectedWaitPenalty = waitPenalty;
+                    selectedCompositeCost = compositeCost;
+                }
+            }
+
+            if (!selectedHospital) {
+                decisionLog.push(`No feasible hospital found for ${requiredSpecialty}.`);
+                return { success: false, status: "NO_FEASIBLE_HOSPITAL", decisionLog };
+            }
+
+            const path = reconstructPath(startNode, selectedHospital.nodeId, previous);
+            const ambulanceResult = findNearestAvailableAmbulance(startNode, graphState, distances);
+
+            if (!ambulanceResult.success) {
+                decisionLog.push("No reachable idle ambulance could be allocated.");
+                return { success: false, status: "QUEUED_NO_AMBULANCE", decisionLog };
+            }
+
+            const ambulance = ambulanceResult.ambulance;
+            
+            // Mutate State
+            selectedHospital.beds -= 1;
+            selectedHospital.medicine -= 1;
+            ambulance.status = "DISPATCHED";
+
+            decisionLog.push(`Routed to Hospital ${selectedHospital.id} (Cost: ${selectedCompositeCost}). Dispatched Ambulance ${ambulance.id}.`);
+            
+            return {
+                success: true,
+                hospital: selectedHospital,
+                ambulance,
+                path,
+                decisionLog
+            };
+        }
+
+        function createHealthcareEngine() {
+            const graphState = generateMockGraph();
+            return {
+                ...graphState,
+                processEmergency(startNode, requiredSpecialty) {
+                    return processEmergency(startNode, requiredSpecialty, graphState);
+                }
+            };
+        }
+
+        // ============================================================================
+        // 2. UI & MAP INTEGRATION
+        // ============================================================================
+        
+        // Init Engine
+        const engine = createHealthcareEngine();
+        let map;
+        let routeLayer;
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initial GSAP Animations
+            gsap.from(".gs-header", { x: 50, opacity: 0, duration: 0.8, ease: "power3.out" });
+            gsap.from(".gs-controls", { x: 50, opacity: 0, duration: 0.8, delay: 0.2, ease: "power3.out" });
+
+            // Initialize Map (Centered around Mumbai/Mira Bhayandar bounding box based on your coords)
+            map = L.map('map', { zoomControl: false }).setView([19.0, 73.0], 10);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; CartoDB',
+                subdomains: 'abcd',
+                maxZoom: 19
+            }).addTo(map);
+
+            // Plot Nodes (Subtle dots)
+            engine.nodes.forEach(node => {
+                if(node.type !== 'HOSPITAL') {
+                    L.circleMarker(node.coordinates, { radius: 2, color: '#334155', fillOpacity: 0.8, stroke: false }).addTo(map);
+                }
+            });
+
+            // Plot Hospitals
+            engine.hospitals.forEach(hosp => {
+                const marker = L.circleMarker(hosp.coordinates, { radius: 10, color: '#0ea5e9', fillColor: '#0284c7', fillOpacity: 0.8, weight: 2 }).addTo(map);
+                marker.bindTooltip(`<b>${hosp.id}</b><br>${hosp.specialty.join(', ')}`, { direction: 'top', className: 'bg-slate-900 text-xs border-slate-700' });
+            });
+
+            // Initial UI Render
+            updateTelemetryUI();
+
+            // Button Event Listener
+            document.getElementById('btn-trigger').addEventListener('click', triggerEmergency);
+        });
+
+        function updateTelemetryUI() {
+            const container = document.getElementById('telemetry-container');
+            container.innerHTML = '';
+            
+            engine.hospitals.forEach((hosp, index) => {
+                const bedPercent = Math.min(100, (hosp.beds / 20) * 100);
+                const medPercent = Math.min(100, (hosp.medicine / 100) * 100);
+                
+                const card = document.createElement('div');
+                card.className = 'card-glass p-3 text-sm flex flex-col gap-2 telemetry-card';
+                card.innerHTML = `
+                    <div class="flex justify-between font-bold text-cyan-400">
+                        <span>${hosp.id}</span>
+                        <span class="text-xs font-normal text-slate-400">${hosp.specialty[0]}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="w-12 text-xs text-slate-400">Beds</span>
+                        <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-blue-500 h-full rounded-full" style="width: ${bedPercent}%"></div>
+                        </div>
+                        <span class="text-xs w-6 text-right">${hosp.beds}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="w-12 text-xs text-slate-400">Meds</span>
+                        <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-emerald-500 h-full rounded-full" style="width: ${medPercent}%"></div>
+                        </div>
+                        <span class="text-xs w-6 text-right">${hosp.medicine}</span>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+
+            // GSAP stagger effect when updating
+            gsap.from(".telemetry-card", { y: 10, opacity: 0, duration: 0.3, stagger: 0.05 });
+        }
+
+        function appendLog(text, type = 'normal') {
+            const logBox = document.getElementById('decision-log');
+            const entry = document.createElement('div');
+            entry.className = type === 'error' ? 'text-red-400' : (type === 'success' ? 'text-cyan-400' : 'text-slate-300');
+            entry.innerHTML = `> ${text}`;
+            logBox.appendChild(entry);
+            logBox.scrollTop = logBox.scrollHeight;
+            
+            gsap.from(entry, { opacity: 0, x: -10, duration: 0.3 });
+        }
+
+        function triggerEmergency() {
+            // Get random village
+            const villages = engine.nodes.filter(n => n.type === "VILLAGE");
+            const randomVillage = villages[Math.floor(Math.random() * villages.length)];
+            const specialty = document.getElementById('specialty-select').value;
+            
+            appendLog(`--- NEW REQUEST: ${specialty} at ${randomVillage.id} ---`, 'normal');
+            
+            // Run algorithm
+            const result = engine.processEmergency(randomVillage.id, specialty);
+            
+            // Print Logs
+            result.decisionLog.forEach(log => appendLog(log));
+
+            if (result.success) { for(let h of engine.hospitals) { console.log(h.id, h.beds); }
+                appendLog('SUCCESS: Dispatch Authorized.', 'success');
+                updateTelemetryUI(); // Re-render stats
+                drawRouteOnMap(result.path, result.hospital.coordinates);
+            } else {
+                appendLog(`FAILURE: ${result.status}`, 'error');
+            }
+            appendLog('', 'normal'); // spacer
+        }
+
+        function drawRouteOnMap(nodeIds, destinationCoords) {
+            if (routeLayer) map.removeLayer(routeLayer);
+            
+            // Convert node IDs to coordinates
+            const latlngs = nodeIds.map(id => {
+                return engine.nodes.find(n => n.id === id).coordinates;
+            });
+
+            // Draw glowing cyan path
+            routeLayer = L.polyline(latlngs, { 
+                color: '#06b6d4', 
+                weight: 4, 
+                className: 'route-glow' 
+            }).addTo(map);
+
+            // Animate map camera to fit the route
+            map.flyToBounds(routeLayer.getBounds(), { padding: [50, 50], duration: 1.5 });
+        }
+    </script>
+</body>
+</html>
